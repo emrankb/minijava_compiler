@@ -1,0 +1,2 @@
+Main-Class: main.Compile
+Class-Path: https://cs.fit.edu/~ryan/cse4251/support.jar

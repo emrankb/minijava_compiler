@@ -1,0 +1,484 @@
+options {
+    OUTPUT_DIRECTORY="./parser/";
+  }
+
+PARSER_BEGIN(MiniJavaParser)
+package parser;
+import syntax.Type;
+import syntax.Program;
+import syntax.MainClass;
+import syntax.ClassDecl;
+import syntax.Expression;
+import syntax.And;
+import syntax.Plus;
+import syntax.Minus;
+import syntax.Times;
+import syntax.LessThan;
+import syntax.Call;
+import syntax.NewArray;
+import syntax.ArrayLength;
+import syntax.ArrayLookup;
+import syntax.NewObject;
+import syntax.IntegerLiteral;
+import syntax.True;
+import syntax.False;
+import syntax.IdentifierExp;
+import syntax.Not;
+import syntax.This;
+import syntax.Identifier;
+import syntax.IdentifierType;
+import syntax.Statement;
+import syntax.Block;
+import syntax.If;
+import syntax.While;
+import syntax.Print;
+import syntax.ArrayAssign;
+import syntax.Assign;
+import syntax.MethodDecl;
+import syntax.FieldDecl;
+import syntax.LocalDecl;
+import syntax.FormalDecl;
+import syntax.SimpleClassDecl;
+import syntax.ExtendingClassDecl;
+import error.ErrorHandler;
+
+import java.util.*;
+
+public class MiniJavaParser {
+  	private static boolean first = false;
+}
+
+PARSER_END(MiniJavaParser)
+
+TOKEN : {
+          <IF: "if" >
+        | <ELSE: "else" >
+        | <WHILE: "while" >
+        | <CLASS: "class" >
+        | <PUBLIC: "public" >
+        | <STATIC: "static" >
+        | <VOID: "void" >
+        | <MAIN: "main" >
+        | <STRING: "String" >
+        | <EXTENDS: "extends" >
+        | <RETURN: "return" >
+        | <TYPEBOOL: "boolean" >
+        | <PRINT: "System.out.println" >
+        | <LENGTH: "length" >
+        | <NEW: "new" >
+        | <THIS: "this" >
+        | <TYPEINT: "int" >
+        | <IntLiteral: (["0"-"9"])+>
+        | <BOOL_LITERAL: "true"|"false">
+        | <CURLYOPEN: "{" >
+        | <CURLYCLOSE: "}" >
+        | <PAROPEN: "(" >
+        | <PARCLOSE: ")" >
+        | <SQBOPEN: "[" >
+        | <SQBCLOSE: "]" >
+        | <SEMICOLON: ";" >
+        | <AND: "&&">
+        | <LESSTHAN: "<">
+        | <PLUS: "+">
+        | <MINUS: "-">
+      	| <TIMES: "*">
+        | <DOT: "." >
+        | <COMMA: "," >
+        | <EXCMARK: "!" >
+        | <EQUAL: "=" >
+        | <#JAVAKEYWORD: "abstract"|"continue"|"for"|"switch"
+						|"assert"|"default"|"package"|"synchronized"
+						|"do"|"goto"|"private"|"break"|"double"|"implements"
+						|"protected"|"throw"|"byte"|"import"|"throws"|"case"
+						|"enum"|"instanceof"|"transient"|"catch"|"short"|"try"
+						|"char"|"final"|"interface"|"finally"|"long"|"strictfp"
+						|"volatile"|"const"|"float"|"native"|"super"|"_">
+		| <INVALID: ~[" ", "\t", "\n", "\b", "\f", "\r", "a"-"z", "A"-"Z" ]|<JAVAKEYWORD>|"null">
+        | <IDENTIFIER: ["a"-"z","A"-"Z"](["a"-"z","A"-"Z","0"-"9","_"])* >
+}
+
+SKIP : {
+           <"//"(~["\n","\r"])* ("\n" | "\r" | "\r\n")>
+        |  <"/*" (~["*"])* "*" ("*" | ~["*","/"] (~["*"])* "*")* "/">
+        | " "
+        | "\t"
+        | "\n"
+        | "\r"
+        | "\f"
+}
+
+
+Program Goal() :
+	    {
+	      	MainClass m;
+	        List <ClassDecl> cl = new ArrayList<ClassDecl>();
+			ClassDecl temp;
+        }
+        {
+        	try {
+        		m=MainClass() (temp=ClassDecl() {cl.add(temp);})* <EOF> {return new Program(m, cl);}
+        	} catch (ParseException e) {
+        		ErrorHandler(e);
+				return null;
+       		}
+        }
+
+MainClass MainClass() :
+        {
+          	Identifier ai1;
+	        Identifier ai2;
+	        Statement as;
+	        Token t1, t2;
+	    }
+        {
+          try {
+				<CLASS> t1=<IDENTIFIER> {ai1=new Identifier(t1.beginLine, t1.beginColumn, t1.image);}
+				<CURLYOPEN>
+					<PUBLIC> <STATIC> <VOID> <MAIN> <PAROPEN> <STRING> <SQBOPEN> <SQBCLOSE> t2=<IDENTIFIER> {ai2=new Identifier(t2.beginLine, t2.beginColumn, t2.image);} <PARCLOSE>
+					<CURLYOPEN>
+						as=Statement()
+					<CURLYCLOSE>
+			    <CURLYCLOSE> {return new MainClass(t1.beginLine, t1.beginColumn, ai1, ai2, as);}
+			} catch (ParseException e) {
+				ErrorHandler(e);
+				return null;
+       		}
+		}
+
+ClassDecl ClassDecl() :
+		{
+			Identifier ai;
+			List <FieldDecl> afl = new ArrayList<FieldDecl>();
+			List <MethodDecl> aml = new ArrayList<MethodDecl>();
+			Identifier aj;
+
+			Identifier tempAj = null;
+			
+			FieldDecl tempField;
+			MethodDecl tempMethod;
+			Token id1, extId;
+			boolean extended = false; 
+		}
+        {
+          	try {
+				<CLASS> id1=<IDENTIFIER> {ai=new Identifier(id1.beginLine, id1.beginColumn, id1.image);} [<EXTENDS> extId=<IDENTIFIER> {tempAj=new Identifier(extId.beginLine, extId.beginColumn, extId.image); extended = true;}]
+	  			<CURLYOPEN>
+	    			(tempField=FieldDecl() {afl.add(tempField);})*
+	   				(tempMethod=MethodDeclaration() {aml.add(tempMethod);})*
+	       		<CURLYCLOSE>
+	       		{
+	       		  if(extended) {
+	       		      aj = tempAj;
+	       			  return new ExtendingClassDecl(ai, aj, afl, aml);
+	       			} else {
+					  return new SimpleClassDecl(ai, afl, aml);
+	       			}
+	       		}
+	       	} catch (ParseException e) {
+				ErrorHandler(e);
+				return null;
+       		}
+        }
+        
+LocalDecl LocalDecl() :
+		{
+			Type at;
+			Identifier ai;
+
+			Token id1;
+		}
+        {
+          	try {
+				at=Type() id1=<IDENTIFIER> <SEMICOLON>
+				{
+				  ai=new Identifier(id1.beginLine, id1.beginColumn, id1.image);
+				  return new LocalDecl(at, ai);
+				}
+			} catch (ParseException e) {
+				ErrorHandler(e);
+				return null;
+       		}
+        }
+
+FieldDecl FieldDecl() :
+		{
+			Type at;
+			Identifier ai;
+
+			Token id1;
+		}
+        {
+          	try {
+				at=Type() id1=<IDENTIFIER> <SEMICOLON>
+				{
+				  ai=new Identifier(id1.beginLine, id1.beginColumn, id1.image);
+				  return new FieldDecl(at, ai);
+				}
+			} catch (ParseException e) {
+				ErrorHandler(e);
+				return null;
+       		}
+        }
+
+MethodDecl MethodDeclaration() :
+		{
+			syntax.Type at;
+      		Identifier ai;
+      		List <FormalDecl> afl = new ArrayList<FormalDecl>();
+      		List <LocalDecl> ll = new ArrayList<LocalDecl>();
+      		List <Statement> asl = new ArrayList<Statement>();
+     		Expression ae;
+
+     		Type t1, t2;
+			Identifier fId1, fId2;
+
+			Token id1, id2, id3;
+			FormalDecl fDec1, fDec2;
+			LocalDecl lDec;
+			Statement sTemp;
+		}
+        {	try {
+				<PUBLIC> at=Type() id1=<IDENTIFIER> {ai=new Identifier(id1.beginLine, id1.beginColumn, id1.image);} <PAROPEN> [t1=Type() id2=<IDENTIFIER> {fId1=new Identifier(id2.beginLine, id2.beginColumn, id2.image); fDec1=new FormalDecl(t1, fId1); afl.add(fDec1);}(<COMMA> t2=Type() id3=<IDENTIFIER> {fId2=new Identifier(id3.beginLine, id3.beginColumn, id3.image); fDec2=new FormalDecl(t2, fId2); afl.add(fDec2);})*] <PARCLOSE>
+	  			<CURLYOPEN>
+	    			(LOOKAHEAD(2) lDec=LocalDecl() {ll.add(lDec);})*
+	   			    (sTemp=Statement() {asl.add(sTemp);})*
+	   			    <RETURN> ae=Expression() <SEMICOLON>
+	 			<CURLYCLOSE>
+	 			{
+					return new MethodDecl(at, ai, afl, ll, asl, ae);
+	 			}
+	 		} catch (ParseException e) {
+				ErrorHandler(e);
+				return null;
+       		}
+        }
+
+Type Type():
+		{
+			Token id1;
+		}
+		{
+		  	try {
+	  			(<TYPEINT> [<SQBOPEN> <SQBCLOSE> {return Type.THE_INT_ARRAY_TYPE;}] {return Type.THE_INTEGER_TYPE;})
+				|<TYPEBOOL> {return Type.THE_BOOLEAN_TYPE;}
+				|id1=<IDENTIFIER> {return new IdentifierType(id1.beginLine, id1.beginColumn, id1.image);}
+			} catch (ParseException e) {
+				ErrorHandler(e);
+				return null;
+       		}
+		}
+
+Statement Statement():
+		{
+			Identifier nameOfArray;
+			Expression indexInArray; 
+			Expression arrE;
+			
+			Expression printE;
+
+			Expression whileE;
+			Statement whileState;
+
+			Expression ifE;
+  			Statement ifS1, ifS2;
+
+			Expression temp = null;
+   			
+			Token id1;
+
+			boolean arrAss = false;
+			Statement blkS;
+			final List <Statement> sl = new ArrayList<Statement>();
+		}
+		{
+		  	try {
+	  			(<CURLYOPEN> (blkS=Statement() {sl.add(blkS);})* <CURLYCLOSE> {return new Block(sl);})
+				| (<IF> <PAROPEN> ifE=Expression() <PARCLOSE> ifS1=Statement() <ELSE> ifS2=Statement() {return new If(ifE.lineNumber, ifE.columnNumber, ifE, ifS1, ifS2);})
+				| (<WHILE> <PAROPEN> whileE=Expression() <PARCLOSE> whileState=Statement() {return new While(whileE.lineNumber, whileE.columnNumber, whileE, whileState);})
+				| (<PRINT> <PAROPEN> printE=Expression() <PARCLOSE> <SEMICOLON> {return new Print(printE.lineNumber, printE.columnNumber, printE);})
+				| (id1=<IDENTIFIER> [<SQBOPEN> temp=Expression() <SQBCLOSE> {arrAss=true;}] <EQUAL> arrE=Expression() <SEMICOLON>
+				  {
+				    if(arrAss) {
+				      	indexInArray=temp;
+						nameOfArray=new Identifier(id1.beginLine, id1.beginColumn, id1.image);
+						return new ArrayAssign(id1.beginLine, id1.beginColumn, nameOfArray, indexInArray, arrE);
+					} else if(!arrAss) { 
+						nameOfArray=new Identifier(id1.beginLine, id1.beginColumn, id1.image);
+						return new Assign(id1.beginLine, id1.beginColumn, nameOfArray, arrE);
+					}
+				  })
+			} catch (ParseException e) {
+				ErrorHandler(e);
+				return null;
+       		}
+		}
+
+// You must remove left recursion before writing your grammar rules in JavaCC.
+// The general approach is to replace rules of the form A - > a | Ax with A - > a (x)*
+Expression Expression():
+	{
+		Expression e1;
+	}
+	{
+	  	try {
+			e1=And() {return e1;}
+		} catch (ParseException e) {
+			ErrorHandler(e);
+			return null;
+       	}
+	}
+
+Expression And():
+	{
+	  Expression e1, e2;
+	}
+	{
+	  	try {
+			e1=LessThan() (<AND> e2=LessThan() {e1=new And(e1.lineNumber, e1.columnNumber, e1, e2); })* {return e1;}
+		} catch (ParseException e) {
+			ErrorHandler(e);
+			return null;
+       	}
+	}
+
+Expression LessThan():
+	{
+		Expression e1, e2;
+	}
+	{
+	  	try {
+			e1=AdditiveExp() [<LESSTHAN> e2=AdditiveExp() { e1=new LessThan(e1.lineNumber, e1.columnNumber, e1, e2);}] {return e1;}
+		} catch (ParseException e) {
+			ErrorHandler(e);
+			return null;
+       	}
+	}
+
+Expression AdditiveExp():
+	{
+		Expression e1, e2;
+
+		boolean plus = false;
+	}
+	{
+	  	try {
+			e1=Times() ((<PLUS> {plus=true;}|<MINUS>) e2=Times() {if(plus) e1=new Plus(e1.lineNumber, e1.columnNumber, e1, e2); else e1=new Minus(e1.lineNumber, e1.columnNumber, e1, e2);})* {return e1;}
+		} catch (ParseException e) {
+			ErrorHandler(e);
+			return null;
+       	}
+	}
+
+Expression Times():
+	{
+		Expression e1, e2;
+
+	}
+	{
+	  	try {
+			e1=PrefixExp() (<TIMES> e2=PrefixExp() {e1=new Times(e1.lineNumber, e1.columnNumber, e1, e2);})* {return e1;}
+		} catch (ParseException e) {
+			ErrorHandler(e);
+			return null;
+       	}
+    }
+
+Expression PrefixExp():
+	{
+		Expression temp1;
+	}
+	{	try {
+			temp1=Not() {return temp1;}| temp1=PostfixExp() {return temp1;}
+		} catch (ParseException e) {
+			ErrorHandler(e);
+			return null;
+       	}
+    }
+
+Expression Not():
+	{
+		Expression nE;
+	}
+	{
+	  	try {
+			(<EXCMARK>)+ nE=PostfixExp() {return new Not(nE.lineNumber, nE.columnNumber, nE);}
+		} catch (ParseException e) {
+			ErrorHandler(e);
+			return null;
+       	}
+	}
+
+Expression PostfixExp():
+	{
+	  	Expression expressionForArray1, expressionForArray2, indexInArray;
+
+		Expression callE;
+   		Identifier callI;
+   		List <Expression> callEl = new ArrayList<Expression>();
+
+   		Token tempT;
+		Expression tempE;
+		Expression fAdder, rest;
+		
+	}
+	{
+	  	try {
+			tempE=PrimaryExp() (<SQBOPEN> indexInArray=Expression() <SQBCLOSE> {expressionForArray1=tempE; return new ArrayLookup(indexInArray.lineNumber, indexInArray.columnNumber, expressionForArray1, indexInArray);}
+						     |LOOKAHEAD(2)
+						     <DOT> tempT=<IDENTIFIER> {callI=new Identifier(tempT.beginLine, tempT.beginColumn, tempT.image);} <PAROPEN> [fAdder=Expression() {callEl.add(fAdder);}(<COMMA> rest=Expression() {callEl.add(rest);})*] <PARCLOSE> {callE=tempE; return new Call(tempT.beginLine, tempT.beginColumn, callE, callI, callEl);}
+						     | <DOT> <LENGTH> {expressionForArray2=tempE; return new ArrayLength(expressionForArray2.lineNumber, expressionForArray2.columnNumber, expressionForArray2);})* {return tempE;}
+		} catch (ParseException e) {
+			ErrorHandler(e);
+			return null;
+       	}
+	}
+
+Expression PrimaryExp():
+	{
+		Token tempThis, tempIntLiteral;
+		int ai;
+
+		Identifier objId;
+		Expression arrE;
+		
+		Token tempBool, id1, idE;
+
+		Expression tempE;
+	}
+	{	try {
+		  	LOOKAHEAD(2)
+			<NEW> <TYPEINT> <SQBOPEN> arrE=Expression() <SQBCLOSE> {return new NewArray(arrE.lineNumber, arrE.columnNumber, arrE);}
+	    	| <NEW> id1=<IDENTIFIER> <PAROPEN> <PARCLOSE> {objId=new Identifier(id1.beginLine, id1.beginColumn, id1.image); return new NewObject(id1.beginLine, id1.beginColumn, objId);}
+	    	| tempIntLiteral=<IntLiteral> {ai=Integer.parseInt(tempIntLiteral.image); return new IntegerLiteral(tempIntLiteral.beginLine, tempIntLiteral.beginColumn, ai);}
+	    	| tempBool=<BOOL_LITERAL> {if(tempBool.image=="true") {return new True(tempBool.beginLine, tempBool.beginColumn);} else {return new False(tempBool.beginLine, tempBool.beginColumn);}}
+	   		| idE=<IDENTIFIER> {return new IdentifierExp(idE.beginLine, idE.beginColumn, idE.image);}
+	    	| tempThis=<THIS> {return new This(tempThis.beginLine, tempThis.beginColumn);}
+	    	| <PAROPEN> tempE=Expression() <PARCLOSE> {return tempE;} 
+	    } catch (ParseException e) {
+			ErrorHandler(e);
+			return null;
+       	}
+	}
+
+JAVACODE
+void ErrorHandler(ParseException e){
+	Token t = e.currentToken.next;
+	int exp = -1;
+	
+	for(int i = 0; exp == -1 && i < e.expectedTokenSequences.length; i++)
+		for(int j = 0; exp == -1 && j < e.expectedTokenSequences[i].length; j++)
+			exp = e.expectedTokenSequences[i][j];
+	if(!MiniJavaParser.first) {
+		if (exp != -1) {
+			System.err.println(String.format("%s:%d.%d: %s", ErrorHandler.filename, t.beginLine, t.beginColumn, String.format("Syntax Error: expecting a %s\n", e.tokenImage[exp])));
+			MiniJavaParser.first = true;
+			throw generateParseException();	
+		}	
+		else {
+			System.err.println(String.format("%s:%d.%d: %s", ErrorHandler.filename, t.beginLine, t.beginColumn, "Syntax Error: unknown"));
+			MiniJavaParser.first = true;
+			throw generateParseException();
+		}
+	} else
+		throw generateParseException();
+}
